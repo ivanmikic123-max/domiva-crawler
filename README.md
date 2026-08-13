@@ -1,234 +1,138 @@
-# Cijene API
+# domiva-crawler
 
-Servis za preuzimanje javnih podataka o cijenama proizvoda u trgovačkim lancima u Republici Hrvatskoj.
+Preuzimanje cjenika hrvatskih trgovačkih lanaca i zapisivanje u NDJSON.
 
-Preuzimanje podataka o cijenama proizvoda u trgovačkim lancima u Republici Hrvatskoj
-temeljeno je na Odluci o objavi cjenika i isticanju dodatne cijene kao mjeri izravne
-kontrole cijena u trgovini na malo, NN 75/2025 od 2.5.2025.
+Fork projekta [cijene-api](https://github.com/senko/cijene-api) autora Senka
+Rašića i suradnika, pod istom **AGPL-3.0** licencom. Vidi [NOTICE](NOTICE) za
+popis izmjena i [LICENSE](LICENSE) za cjelovit tekst licence.
 
-Trenutno podržani trgovački lanci:
+---
 
-* Konzum
-* Lidl
-* Plodine
-* Spar
-* Tommy
-* Studenac
-* Kaufland
-* Eurospin
-* dm
-* KTC
-* Metro
-* Trgocentar
-* Žabac
-* Vrutak
-* Ribola
-* NTL
-* Boso
-* Brodokomerc
-* Lorenco
-* Trgovina Krk
-* Roto
-* Jadranka Trgovina
-* Gavranović
-* Branka
-* Djelo Vodice
-* Bure
-* Dukat
-* Diskont Stanić (zahtjeva Google API ključ za pristup javnom Google Driveu)
-* Stridon
+## Što ovaj repozitorij jest i što nije
 
-Popis trgovačkih lanaca preuzet sa [IamMusavaRibica/cijene.org](https://github.com/IamMusavaRibica/cijene.org) repozitorija
-pod AGPL licencom, od kojeg smo i posudili podršku za neke od podržanih trgovačkih lanaca. Hvala!
+**Jest:** program koji jednom dnevno povuče cjenike koje trgovci objavljuju po
+Odluci NN 75/2025 i zapiše ih u dogovorenom obliku.
 
-## Softverska implementacija
+**Nije:** dio Domive. Domiva je zaseban, zatvoreni projekt i ovaj kod **ne
+uvozi**. Dodiruju se na točno dva mjesta:
 
-Softver je izgrađen na Pythonu a sastoji se od dva dijela:
+1. **Datoteke u objektnoj pohrani**
 
-* Crawler - preuzima podatke s web stranica trgovačkih lanaca (`crawler`)
-* Web servis - API koji omogućava pristup podacima o cijenama proizvoda (`service`)
+   ```
+   raw/{datum}/{lanac}/prices.ndjson
+   raw/{datum}/{lanac}/stores.ndjson
+   ```
 
-## Instalacija
+2. **Jedan HTTP poziv** — `POST /internal/ingest/chain-ready`, autoriziran
+   zajedničkom tajnom, koji samo javlja da je lanac gotov.
 
-Za instalaciju crawlera potrebno je imati instaliran Python 3.13 ili noviji. Preporučamo korištenje `uv` za setup projekta:
+Ta granica nije stvar ukusa. AGPL-3.0 traži da se izvedeno djelo objavi pod istom
+licencom; držanjem crawlera u zasebnom procesu koji s Domivom razgovara preko
+podataka, obveze ostaju unutar ovog repozitorija — koji je javan.
+
+## Upotreba
 
 ```bash
-git clone https://github.com/senko/cijene-api.git
-cd cijene-api
-uv sync --dev
+crawl --list                              # podržani lanci
+crawl --chain lidl --date 2026-08-11      # jedan lanac
+crawl --all                               # svi lanci, današnji datum
+crawl --chain lidl --no-notify            # bez javljanja Domivi
 ```
 
-### Docker
+Zadani datum je **današnji po zagrebačkom danu**, ne po UTC-u.
 
-Projekt uključuje potpunu Docker konfiguraciju za lakše pokretanje i deployment. Docker setup omogućava:
+Ispad jednog lanca ne zaustavlja ostale. Izlazni kod je `1` samo kad nijedan
+lanac nije prošao.
 
-* Containeriziran API servis s PostgreSQL bazom podataka
-* Automatsko pokretanje crawler servisa
-* Razvojno okruženje s hot reload funkcionalnosti
-* Automatizirano cron pokretanje crawler-a
+### Okruženje
 
-Za detaljne Docker instrukcije, konfiguraciju i sve opcije pokretanja, pogledajte [DOCKER.md](DOCKER.md).
+| Varijabla                | Značenje                                              |
+| ------------------------ | ----------------------------------------------------- |
+| `DOMIVA_API_URL`         | Adresa Domivinog API-ja. Bez nje se javljanje preskače |
+| `DOMIVA_CRAWLER_SECRET`  | Zajednička tajna, najmanje 32 znaka                    |
 
-**Brza instalacija s Docker-om:**
+Bez te dvije varijable crawler i dalje radi i zapisuje datoteke — samo ne javlja.
+To je namjerno: mora se dati pokrenuti i ispitati bez Domive.
+
+## Oblik zapisa
+
+Jedan JSON po retku, bez zareza i uglatih zagrada. Polje koje lanac **ne
+objavljuje ostaje `null`** — nikad nula, nikad prazan niz.
+
+`prices.ndjson`:
+
+```json
+{"store_code":"1041","external_code":"LD-100241","ean":"3850001000017",
+ "name":"Mlijeko trajno 2,8% m.m.","brand":"Milbona",
+ "net_quantity":1.0,"unit":"l","category_raw":"mliječni proizvodi",
+ "price":1.09,"unit_price":1.09,"special_price":null,
+ "best_price_30":0.99,"anchor_price":1.05}
+```
+
+`stores.ndjson`:
+
+```json
+{"store_code":"1041","name":"Lidl Zagreb — Zavrtnica","address":"Zavrtnica 17",
+ "city":"Zagreb","zip_code":"10000","lat":45.7982,"lng":15.9954}
+```
+
+Ista je shema opisana i s Domivine strane, u `packages/shared/src/sheme/cjenik.ts`.
+Kad se ovdje mijenja polje, mijenja se i ondje — inače Domiva odbije cijeli lanac.
+
+### Koordinate poslovnica
+
+Trgovci ih u cjenicima **ne objavljuju**. Dolaze iz
+[`enrichment/stores.csv`](enrichment/README.md), koji je pod AGPL-3 licencom
+projekta — za razliku od `products.csv`, koji je uklonjen jer je pod
+CC BY-NC-SA.
+
+Pokrivenost je neujednačena i to treba znati:
+
+| Lanac    | Poslovnica |     | Lanac       | Poslovnica |
+| -------- | ---------: | --- | ----------- | ---------: |
+| Konzum   |        286 |     | Tommy       |         79 |
+| Plodine  |        232 |     | Kaufland    |         50 |
+| Spar     |        143 |     | KTC         |         34 |
+| Lidl     |        110 |     | Eurospin    |         31 |
+| Studenac |         18 |     | Trgocentar  |          1 |
+
+Ukupno **984 poslovnice u 10 lanaca**. Preostalih 19 lanaca nema nijednu
+geokodiranu poslovnicu; njihovi artikli su vidljivi u katalogu cijena, ali ne i
+u pretrazi po radijusu. To je jasno stanje, ne tiha greška.
+
+## Sigurnost
+
+Crawler ide na tuđe adrese koje se mijenjaju bez najave, pa svaki HTTP zahtjev
+prolazi kroz provjeru odredišta ([`domiva/dohvat.py`](domiva/dohvat.py)):
+odbijaju se petlja, privatni rasponi i adresa `169.254.169.254`, s koje se u
+oblaku čitaju vjerodajnice poslužitelja.
+
+Provjera stoji na razini prijenosnog sloja, pa vrijedi za **svaku kariku lanca
+preusmjeravanja**, ne samo za prvu adresu.
+
+Granica koju treba znati: ime se razrješava pri provjeri, a `httpx` ga razrješava
+ponovno pri spajanju, pa se DNS rebinding provuče. Ostatak pokriva mrežna
+izolacija spremnika.
+
+## Razvoj
 
 ```bash
-git clone https://github.com/senko/cijene-api.git
-cd cijene-api
-cp .env.docker.example .env
-# Uredite .env prema potrebi
-docker-compose up -d
+uv sync
+uv run pytest
+uv run ruff check .
 ```
 
-**Pokreni samo crawler unutar Docker-a**
+## Praćenje uzvodnog projekta
+
+Uzvodni repozitorij je pod udaljenom oznakom `upstream`; guranje na njega je
+onemogućeno.
 
 ```bash
-docker build -f crawler.Dockerfile -t crawler .
-docker run -v $(pwd)/output:/app/output crawler -c "dm, eurospin, kaufland, konzum, lidl, metro, plodine, spar, studenac, zabac" -z false -v info ./output
+git fetch upstream
+git merge upstream/main
 ```
 
-## Korištenje
-
-### Crawler
-
-Za pokretanje crawlera potrebno je pokrenuti sljedeću komandu:
-
-```bash
-uv run -m crawler.cli.crawl /path/to/output-folder/
-```
-
-Ili pomoću Pythona direktno (u adekvatnoj virtualnoj okolini):
-
-```bash
-python -m crawler.cli.crawl /path/to/output-folder/
-```
-
-Crawler prima opcije `-l` za listanje podržanih trgovačkih lanaca, `-d` za
-odabir datuma (default: trenutni dan), `-c` za odabir lanaca (default: svi) te
-`-h` za ispis pomoći.
-
-### Pokretanje u Windows okolini
-
-**Napomena:** Za Windows korisnike - postavite vrijednost `PYTHONUTF8` environment varijable na `1` ili pokrenite python s `-X utf8` flag-om kako bi izbjegli probleme s character encodingom. Više detalja [na poveznici](https://github.com/senko/cijene-api/issues/9#issuecomment-2911110424).
-
-### Google Drive API ključ
-
-Diskont Stanić sprema podatke o cijenama na Google Drive, koji ne dozvoljava anonimni pristup (download datoteke). Za pristup podacima potrebno je imati Google Cloud račun i kreirati API ključ sa pristupom za Google Storage / Google Drive. Taj ključ treba staviti u `.env` datoteku (vidjeti `.env.example` - to je jedina opcija koja je potrebna za crawler dio).
-
-### Web servis
-
-Web servis koristi PostgreSQL bazu podataka za pohranu podataka o cijenama.
-
-#### Konfiguracija okruženja
-
-Projekt koristi različite primjere environment datoteka za različite načine pokretanja:
-
-- **`.env.example`** - za lokalni razvoj (bez Docker-a)
-- **`.env.docker.example`** - za Docker deployment
-
-Za lokalni razvoj, kreirajte datoteku `.env` na osnovu `.env.example`:
-
-```bash
-cp .env.example .env
-# Uredite .env prema potrebi za lokalni razvoj
-```
-
-Prije pokretanja servisa, kreirajte datoteku `.env` sa konfiguracijskim varijablama.
-Primjer datoteke sa zadanim (default) vrijednostima za lokalni razvoj može se naći u `.env.example`.
-
-Nakon što ste kreirali `.env` datoteku, pokrenite servis koristeći:
-
-```bash
-uv run -m service.main
-```
-
-Servis će biti dostupan na `http://localhost:8000` (ako niste mijenjali port), a na
-`http://localhost:8000/docs` je dostupna Swagger dokumentacija API-ja.
-
-#### Uvoz podataka
-
-Servis drži podatke u PostgreSQL bazi podataka. Za uvoz podataka iz CSV
-datoteka koje kreira crawler, možete koristiti sljedeću komandu:
-
-```bash
-uv run -m service.db.import /path/to/csv-folder/
-```
-
-CSV folder treba biti imenovan u `YYYY-MM-DD` formatu, gdje `YYYY-MM-DD`
-predstavlja datum za koji se podaci uvoze, i sadržavati CSV datoteke u
-istom formatu kakve generira crawler (*ne* CSV datoteke skinute sa stranica
-nekog trgovačkog lanca!).
-
-##### Opcije za uvoz
-
-Moguće je preskočiti računanje statistika tijekom uvoza (što može značajno ubrzati proces):
-
-```bash
-uv run -m service.db.import -s /path/to/csv-folder/
-# ili
-uv run -m service.db.import --skip-stats /path/to/csv-folder/
-```
-
-Za debug informacije koristite `-d` opciju:
-
-```bash
-uv run -m service.db.import -d /path/to/csv-folder/
-```
-
-#### Računanje statistika
-
-Za računanje statistika bez uvoza podataka (korisno za već uvezene podatke), koristite dedicirani stats servis:
-
-```bash
-# Računanje statistika za jedan datum
-uv run -m service.db.stats 2024-01-15
-
-# Više datuma odjednom
-uv run -m service.db.stats 2024-01-15 2024-01-16 2024-01-17
-
-# S debug informacijama
-uv run -m service.db.stats -d 2024-01-15
-```
-
-Stats servis može se koristiti za:
-- **Ponovno računanje statistika** nakon promjena u bazi podataka
-- **Batch procesiranje** statistika za više datuma
-- **Nezavisan rad** od import procesa za bolje performanse
-
-## Dodatni podaci o proizvodima i trgovinama
-
-Dodatni pročišćeni podaci o proizvodima (naziv, marka, količina, jedinica mjere)
-za najčeših ~30 tisuća proizvoda dostupni su u `enrichment/products.csv` datoteci
-a mogu se uvesti u bazu koristeći sljedeću komandu:
-
-```bash
-uv run -m service.db.enrich -p enrichment/products.csv
-```
-
-Dodatni podaci o trgovinama (adresa, geolokacija, telefon) dostupni su u
-`enrichment/stores.csv` datoteci a mogu se uvesti u bazu koristeći sljedeću
-komandu:
-
-```bash
-uv run -m service.db.enrich -s enrichment/stores.csv
-```
-
-#### Kreiranje korisnika
-
-Neki API endpointovi zahtijevaju autentifikaciju. Korisnike možete kreirati
-direktno u bazi podataka koristeći SQL, npr:
-
-```sql
-INSERT INTO users (name, api_key, is_active) VALUES ('Senko', 'secret-key', TRUE);
-```
-
-## Licenca
-
-Ovaj projekt je licenciran pod [AGPL-3 licencom](LICENSE).
-
-Podaci prikupljeni putem ovog projekta su javni i dostupni svima, temeljem
-Odluke o objavi cjenika i isticanju dodatne cijene kao mjeri izravne
-kontrole cijena u trgovini na malo, NN 75/2025 od 2.5.2025.
-
-Pročišćeni CSV podaci o proizvodima
-([`enrichment/products.csv`](enrichment/products.csv))
-dostupni su pod [CC BY-NC-SA licencom](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+Izmjene Domive su namjerno skupljene u `domiva/`, uz jednu jedinu promjenu u
+uzvodnom kodu — zamjenu HTTP klijenta u `crawler/store/base.py`. Sve ostalo u
+`crawler/` i `common/` ostaje netaknuto, pa se uzvodne izmjene povlače bez
+sukoba.

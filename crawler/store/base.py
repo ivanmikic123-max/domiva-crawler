@@ -12,6 +12,8 @@ from zipfile import ZipFile
 import httpx
 from bs4 import BeautifulSoup
 
+from domiva.dohvat import sigurni_klijent
+
 from .models import Product, Store
 
 logger = getLogger(__name__)
@@ -39,10 +41,17 @@ class BaseCrawler:
     """Mapping from CSV column names to non-price fields and whether they are required."""
 
     def __init__(self):
-        self.client = httpx.Client(
+        # Izmjena Domive: klijent koji odbija privatne mreže.
+        #
+        # Uzvodni klijent prati preusmjeravanja bez provjere odredišta, pa lanac
+        # koji objavi preusmjeravanje na `169.254.169.254` može natjerati crawler
+        # da dohvati metapodatke poslužitelja i zapiše ih kao cjenik. Provjera je
+        # na razini prijenosnog sloja, pa pokriva svaku kariku lanca
+        # preusmjeravanja (SECURITY.md, odjeljak 3).
+        self.client = sigurni_klijent(
             timeout=self.TIMEOUT,
-            follow_redirects=True,
             verify=self.VERIFY_TLS_CERT,
+            user_agent=self.USER_AGENT,
         )
 
     def fetch_text(

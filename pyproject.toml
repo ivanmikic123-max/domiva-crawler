@@ -1,29 +1,44 @@
 [project]
-name = "cijene"
+name = "domiva-crawler"
 version = "0.1.0"
-description = "Service for product pricing data by Croatian grocery chains."
+description = "Preuzimanje cjenika hrvatskih trgovačkih lanaca. Fork projekta cijene-api, AGPL-3.0."
 readme = "README.md"
 requires-python = ">=3.13"
+license = { file = "LICENSE" }
 dependencies = [
-    "asyncpg>=0.30.0",
     "beautifulsoup4>=4.13.4",
-    "fastapi[standard]>=0.115.12",
     "httpx>=0.28.1",
     "lxml>=5.4.0",
     "openpyxl>=3.1.5",
     "pydantic>=2.11.4",
+    # Traži ga `crawler/store/stanic.py` — taj lanac čita `GOOGLE_API_KEY` iz
+    # okruženja. Izgleda kao ovisnost poslužitelja, ali nije.
     "python-dotenv>=1.1.0",
-    "uvicorn>=0.34.2",
+    # Bez ovoga `zoneinfo` nema bazu vremenskih zona: na Windowsu je nema uopće,
+    # a u vitkim spremnicima zna ispasti pri čišćenju slike. Crawler bi tada pao
+    # na `ZoneInfo("Europe/Zagreb")` — dakle na računanju datuma, prije nego išta
+    # napravi.
+    "tzdata>=2025.1",
 ]
+
+# Uklonjeno u odnosu na uzvodni projekt: `asyncpg`, `fastapi`, `uvicorn`. Sve
+# troje je služilo poslužiteljskom dijelu, kojeg ovdje nema. Crawler s Domivom
+# razgovara preko datoteka i jednog HTTP poziva, nikad preko baze.
+
+[project.scripts]
+crawl = "domiva.cli:main"
 
 [dependency-groups]
 dev = [
-    "pre-commit>=4.2.0",
-    "pyright>=1.1.400",
     "pytest>=8.0.0",
     "ruff>=0.11.10",
-    "ty>=0.0.1a3",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.setuptools.packages.find]
+include = ["crawler*", "common*", "domiva*"]

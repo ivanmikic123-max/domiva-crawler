@@ -1,77 +1,37 @@
-# Multi-stage build for crawler/API services
-FROM python:3.13-slim AS base
+# Crawler kao zaseban servis.
+#
+# Ne dijeli sliku s Domivom i ne vidi njezinu bazu. Jedino što mu treba je izlaz
+# na internet, mjesto za zapis i adresa API-ja kojoj javlja da je gotov.
 
-# Add labels for better container management
-LABEL org.opencontainers.image.title="Cijene API"
-LABEL org.opencontainers.image.description="Croatian grocery price tracking service"
-LABEL org.opencontainers.image.version="0.1.0"
-LABEL org.opencontainers.image.authors="Cijene API Team"
+FROM python:3.13-slim AS temelj
 
-# Set environment variables for Python optimization and locale
+# `lxml` traži prevoditelj samo kad kotačić za platformu ne postoji; ostalo je
+# potrebno za TLS prema lancima koji još stoje na starijim postavkama.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUTF8=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    TZ=Europe/Zagreb \
-    DEBIAN_FRONTEND=noninteractive \
-    LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8
+    PIP_NO_CACHE_DIR=1
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    unzip \
-    ca-certificates \
-    tzdata \
-    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
-    && echo $TZ > /etc/timezone \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean \
-    && apt-get autoremove -y
-
-# Install uv (pinned version for reproducibility)
-RUN pip install --no-cache-dir uv==0.7.14
-
-FROM base AS deps
 WORKDIR /app
 
-# Copy dependency files first (better caching)
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml README.md ./
+COPY crawler ./crawler
+COPY common ./common
+COPY domiva ./domiva
 
-FROM deps AS common
+RUN pip install --no-cache-dir .
 
-# Create non-root user with proper security settings
-RUN useradd --create-home --shell /bin/bash --uid 1001 --no-log-init appuser \
-    && chown -R appuser:appuser /app \
-    && mkdir -p /app/data /app/output \
-    && chown -R appuser:appuser /app/data /app/output
+# Ne radi kao root. Crawler obrađuje sadržaj s tuđih poslužitelja, pa je to
+# jedino mjesto u sustavu gdje tuđi podaci dolaze u dodir s parserima.
+RUN useradd --create-home --uid 10001 crawler \
+    && mkdir -p /podaci \
+    && chown -R crawler:crawler /podaci
+USER crawler
 
-# Switch to non-root user early for security
-USER appuser
+VOLUME ["/podaci"]
 
-# Development targets
-FROM common AS development-api
-EXPOSE 8000
-RUN uv sync --frozen --dev
-CMD ["uv", "run", "-m", "service.main", "--reload"]
-
-FROM common AS development-crawler
-RUN uv sync --frozen --dev
-CMD ["uv", "run", "-m", "crawler.cli.crawl", "/app/output"]
-
-# Production targets
-FROM common AS production-api
-EXPOSE 8000
-RUN uv sync --frozen --no-dev
-COPY --chown=appuser:appuser service/ ./service/
-COPY --chown=appuser:appuser common/ ./common/
-COPY --chown=appuser:appuser enrichment/ ./enrichment/
-CMD ["uv", "run", "-m", "service.main"]
-
-FROM common AS production-crawler
-RUN uv sync --frozen --no-dev
-COPY --chown=appuser:appuser crawler/ ./crawler/
-COPY --chown=appuser:appuser common/ ./common/
-CMD ["uv", "run", "-m", "crawler.cli.crawl", "/app/output"]
+ENTRYPOINT ["crawl"]
+CMD ["--all", "--output", "/podaci"]

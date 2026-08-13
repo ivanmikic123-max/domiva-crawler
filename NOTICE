@@ -1,0 +1,58 @@
+domiva-crawler
+==============
+
+Ovaj je repozitorij izveden iz projekta cijene-api.
+
+    Izvorno djelo:  cijene-api
+    Autor:          Senko Rašić i suradnici
+    Izvor:          https://github.com/senko/cijene-api
+    Licenca:        GNU Affero General Public License v3.0
+
+Zadržana je izvorna AGPL-3.0 licenca. Cjelovit tekst je u datoteci LICENSE.
+Izmjene su objavljene pod istom licencom, kako AGPL-3.0 i traži.
+
+
+Što je promijenjeno u odnosu na izvorno djelo
+---------------------------------------------
+
+Uklonjeno:
+
+  · `service/`     — poslužiteljski dio (FastAPI, PostgreSQL). Ovaj repozitorij
+                     je samo crawler; s Domivom razgovara preko objektne pohrane
+                     i jednog HTTP poziva, nikad izravno preko baze.
+
+  · `enrichment/products.csv`
+                   — pročišćeni podaci o proizvodima. Uzvodni README ih izričito
+                     stavlja pod CC BY-NC-SA licencu, koja **ne dopušta
+                     komercijalnu upotrebu**. Domiva je pretplatnički servis, pa
+                     se ne smiju koristiti ni posredno. Koriste se isključivo
+                     sirovi cjenici koje trgovci objavljuju po Odluci NN 75/2025.
+
+                     `enrichment/cities.csv` i `enrichment/stores.csv` **ostaju**:
+                     ista rečenica iz uzvodnog READMEa njih ne spominje, pa stoje
+                     pod AGPL-3 licencom projekta. Vidi `enrichment/README.md`.
+
+  · `docs/`, Docker datoteke poslužitelja — vezani uz uklonjeni dio.
+
+Dodano:
+
+  · `domiva/`      — izlaz u NDJSON obliku koji Domiva očekuje, koordinate
+                     poslovnica, zaštićeni dohvat i obavijest da je lanac gotov.
+
+Sami crawleri po lancima (`crawler/store/*.py`), zajedničke pomoćne funkcije
+(`common/`) i njihovi testovi ostaju kakvi jesu, uz zasluge izvornim autorima.
+
+
+Odnos prema Domivi
+------------------
+
+Domiva je zaseban, zatvoreni projekt i **ne uvozi ovaj kod**. Dodirne točke su
+točno dvije:
+
+  1. NDJSON datoteke u objektnoj pohrani:
+     `raw/{datum}/{lanac}/prices.ndjson` i `raw/{datum}/{lanac}/stores.ndjson`
+
+  2. HTTP poziv `POST /internal/ingest/chain-ready`, autoriziran zajedničkom
+     tajnom.
+
+Time AGPL-3.0 obveze ostaju unutar ovog repozitorija, koji je javan.
