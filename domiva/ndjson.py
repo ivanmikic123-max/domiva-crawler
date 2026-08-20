@@ -187,7 +187,11 @@ def _zapisi(putanja: Path, redci: Iterable[dict[str, Any]], stlaci: bool) -> int
     putanja.parent.mkdir(parents=True, exist_ok=True)
 
     otvori = (
-        (lambda: gzip.open(putanja.with_suffix(putanja.suffix + ".gz"), "wt", encoding="utf-8"))
+        (
+            lambda: gzip.open(
+                putanja.with_suffix(putanja.suffix + ".gz"), "wt", encoding="utf-8"
+            )
+        )
         if stlaci
         else (lambda: putanja.open("w", encoding="utf-8"))
     )

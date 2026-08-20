@@ -1,49 +1,57 @@
-name: Build
+name: Provjere
+
+# Radni tok je naslijeđen od uzvodnog projekta i ovdje je sveden na ono što se u
+# ovom forku doista vrti.
+#
+# Matrica preko tri operativna sustava je maknuta: crawler u produkciji radi u
+# Linux spremniku i nigdje drugdje. Provjera na macOS-u i Windowsu trostruko je
+# plaćala isto saznanje.
 
 on:
   push:
-    branches: ["main"]
+    branches: ['main']
   pull_request:
-    branches: ["main"]
+    branches: ['main']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.13"]
-        os: [ubuntu-24.04, macos-latest, windows-latest]
+  provjere:
+    name: Lint, tipovi, testovi
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - name: uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.13'
+          enable-cache: true
 
-      - name: Set up uv
-        if: ${{ matrix.os == 'ubuntu-24.04' || matrix.os == 'macos-latest' }}
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
-
-      - name: Set up uv
-        if: ${{ matrix.os == 'windows-latest' }}
-        run: irm https://astral.sh/uv/install.ps1 | iex
-        shell: powershell
-
-      - name: Install dependencies
+      - name: Ovisnosti
         run: uv sync --dev
 
-      - name: Lint with ruff
+      - name: Lint
         run: uv run ruff check --output-format github
 
-      - name: Check code style with ruff
+      - name: Oblikovanje
         run: uv run ruff format --check --diff
 
-      - name: Check type hints with ty
-        run: uv run ty check
+      # Samo `domiva/`, i to namjerno.
+      #
+      # Uzvodni kod u `crawler/` i `common/` daje dvadesetak dijagnostika, a
+      # njegovo ispravljanje značilo bi sukob pri svakom povlačenju uzvodnih
+      # izmjena. Isto vrijedi za testove koji uzvodne Pydantic modele grade
+      # preko `**kwargs` — ondje provjera tipova ne može znati koji ključ ide u
+      # koje polje, pa prijavljuje ispravan kod.
+      #
+      # Granica je ista koju povlači README: naše je `domiva/`, ostalo se ne
+      # dira.
+      - name: Tipovi
+        run: uv run ty check domiva
 
-      - name: Run tests with pytest
+      - name: Testovi
         run: uv run pytest

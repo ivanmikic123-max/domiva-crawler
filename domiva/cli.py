@@ -113,7 +113,9 @@ def main() -> int:
     skupina.add_argument("--all", action="store_true", help="Svi podržani lanci.")
     skupina.add_argument("--list", action="store_true", help="Ispiši lance i izađi.")
 
-    razclanik.add_argument("--date", type=_datum, default=None, help="YYYY-MM-DD, zadano danas.")
+    razclanik.add_argument(
+        "--date", type=_datum, default=None, help="YYYY-MM-DD, zadano danas."
+    )
     razclanik.add_argument(
         "--output",
         type=Path,

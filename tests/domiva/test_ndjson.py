@@ -82,13 +82,23 @@ class TestRedakCjenika:
 
     def test_kolicina_s_decimalnim_zarezom(self):
         # Cjenici dolaze iz tridesetak sustava; zarez je češći od točke.
-        assert redak_cjenika(poslovnica(), proizvod(quantity="1,5"))["net_quantity"] == 1.5
+        assert (
+            redak_cjenika(poslovnica(), proizvod(quantity="1,5"))["net_quantity"] == 1.5
+        )
 
     def test_kolicina_s_jedinicom_u_istom_polju(self):
-        assert redak_cjenika(poslovnica(), proizvod(quantity="500 g"))["net_quantity"] == 500
+        assert (
+            redak_cjenika(poslovnica(), proizvod(quantity="500 g"))["net_quantity"]
+            == 500
+        )
 
     def test_nečitljiva_kolicina_ostaje_prazna(self):
-        assert redak_cjenika(poslovnica(), proizvod(quantity="po dogovoru"))["net_quantity"] is None
+        assert (
+            redak_cjenika(poslovnica(), proizvod(quantity="po dogovoru"))[
+                "net_quantity"
+            ]
+            is None
+        )
 
     def test_nepoznata_jedinica_ostaje_prazna(self):
         # Pogrešna jedinica je gora od nikakve — u planeru daje krivu količinu
@@ -100,7 +110,10 @@ class TestRedakCjenika:
         assert redak_cjenika(poslovnica(), proizvod(unit="Kom"))["unit"] == "kom"
 
     def test_ean_zadrzava_samo_znamenke(self):
-        assert redak_cjenika(poslovnica(), proizvod(barcode="385-000-1000017"))["ean"] == "3850001000017"
+        assert (
+            redak_cjenika(poslovnica(), proizvod(barcode="385-000-1000017"))["ean"]
+            == "3850001000017"
+        )
 
     def test_prekratak_ean_ostaje_prazan(self):
         assert redak_cjenika(poslovnica(), proizvod(barcode="123"))["ean"] is None
@@ -111,14 +124,22 @@ class TestRedakCjenika:
     def test_ean_s_krivom_kontrolnom_znamenkom_prolazi(self):
         # I dalje je koristan kao ključ prema Open Food Factsu, a promašaj ondje
         # ne košta ništa.
-        assert redak_cjenika(poslovnica(), proizvod(barcode="3850001000010"))["ean"] is not None
+        assert (
+            redak_cjenika(poslovnica(), proizvod(barcode="3850001000010"))["ean"]
+            is not None
+        )
 
     def test_naziv_bez_sadrzaja_ne_ostaje_prazan(self):
         # Zod shema traži barem jedan znak; prazan naziv srušio bi cijeli redak.
-        assert redak_cjenika(poslovnica(), proizvod(product="   "))["name"] == "(bez naziva)"
+        assert (
+            redak_cjenika(poslovnica(), proizvod(product="   "))["name"]
+            == "(bez naziva)"
+        )
 
     def test_negativna_cijena_ostaje_prazna(self):
-        assert redak_cjenika(poslovnica(), proizvod(price=Decimal("-1")))["price"] is None
+        assert (
+            redak_cjenika(poslovnica(), proizvod(price=Decimal("-1")))["price"] is None
+        )
 
 
 class TestRedakPoslovnice:
@@ -178,8 +199,12 @@ class TestZapis:
         assert all(json.loads(r)["store_code"] == "1041" for r in redci)
 
     def test_artikl_bez_cijene_ne_ulazi_u_cjenik(self, tmp_path):
-        store = poslovnica(items=[proizvod(price=Decimal("-5")), proizvod(product_id="LD-2")])
-        broj_cijena, _ = zapisi_lanac(tmp_path, "2026-08-11", "lidl", [store], stlaci=False)
+        store = poslovnica(
+            items=[proizvod(price=Decimal("-5")), proizvod(product_id="LD-2")]
+        )
+        broj_cijena, _ = zapisi_lanac(
+            tmp_path, "2026-08-11", "lidl", [store], stlaci=False
+        )
 
         assert broj_cijena == 1
 
@@ -191,7 +216,9 @@ class TestZapis:
         store = poslovnica(items=[proizvod(product="Šećer bijeli — Đakovo")])
         zapisi_lanac(tmp_path, "2026-08-11", "lidl", [store], stlaci=False)
 
-        sadrzaj = (tmp_path / "raw" / "2026-08-11" / "lidl" / "prices.ndjson").read_text("utf-8")
+        sadrzaj = (
+            tmp_path / "raw" / "2026-08-11" / "lidl" / "prices.ndjson"
+        ).read_text("utf-8")
         assert "Šećer" in sadrzaj
 
 
@@ -242,7 +269,9 @@ class TestSifreLanaca:
 
     def test_svaki_lanac_u_domivi_ima_crawler(self):
         nedostaje = self.SIFRE_U_DOMIVI - set(CRAWLERS)
-        assert nedostaje == set(), f"Domiva očekuje lance bez crawlera: {sorted(nedostaje)}"
+        assert nedostaje == set(), (
+            f"Domiva očekuje lance bez crawlera: {sorted(nedostaje)}"
+        )
 
     def test_ima_ih_dvadeset_devet(self):
         assert len(CRAWLERS) == 29

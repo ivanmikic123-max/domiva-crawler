@@ -34,7 +34,9 @@ class TestProvjeraOdredista:
         with pytest.raises(NedopustenoOdrediste):
             provjeri_odrediste(httpx.URL(adresa))
 
-    @pytest.mark.parametrize("adresa", ["file:///etc/passwd", "ftp://primjer.hr/", "gopher://x/"])
+    @pytest.mark.parametrize(
+        "adresa", ["file:///etc/passwd", "ftp://primjer.hr/", "gopher://x/"]
+    )
     def test_druge_sheme_padaju(self, adresa):
         with pytest.raises(NedopustenoOdrediste):
             provjeri_odrediste(httpx.URL(adresa))

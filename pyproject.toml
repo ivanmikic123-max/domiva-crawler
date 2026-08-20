@@ -32,13 +32,21 @@ crawl = "domiva.cli:main"
 dev = [
     "pytest>=8.0.0",
     "ruff>=0.11.10",
+    # Provjeru tipova traži naslijeđeni radni tok. Vrti se samo nad `domiva/` —
+    # vidi komentar u `.github/workflows/ci.yml`.
+    "ty>=0.0.1a15",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [tool.ruff]
-line-length = 100
+# Ista duljina retka kao uzvodno (ruffov zadani 88), i to namjerno. Sa 100 bi
+# `ruff format --check` prijavio trideset **uzvodnih** datoteka kao
+# neformatirane; njihovo preoblikovanje značilo bi sukob pri svakom
+# `git merge upstream/main`, a upravo se to izbjegava držanjem izmjena u
+# `domiva/` (vidi README, „Praćenje uzvodnog projekta").
+line-length = 88
 
 [tool.setuptools.packages.find]
 include = ["crawler*", "common*", "domiva*"]
