@@ -292,3 +292,46 @@ def test_citanje_kolicine(ulaz, ocekivano):
     from domiva.ndjson import _broj
 
     assert _broj(ulaz) == ocekivano
+
+
+class TestNatpisPakiranja:
+    """
+    Lidl u `JEDINICA_MJERE` upisuje cijelu mjeru, ne jedinicu.
+
+    Prvi uvoz stvarnih podataka pokazao je posljedicu: od 7004 Lidlova
+    proizvoda samo 15 je imalo jedinicu. Bez nje Domiva ne može izračunati
+    cijenu po mjeri, pa je cijeli popis za kupnju ostao „NIJE DOSTUPNO" — a
+    nigdje nije bilo greške koja bi na to uputila.
+    """
+
+    def test_natpis_daje_i_broj_i_jedinicu(self):
+        redak = redak_cjenika(poslovnica(), proizvod(quantity="0.8", unit="800g"))
+        assert redak["net_quantity"] == 800
+        assert redak["unit"] == "g"
+
+    def test_litre_iz_natpisa(self):
+        redak = redak_cjenika(poslovnica(), proizvod(quantity="1.5", unit="1,5l"))
+        assert redak["net_quantity"] == 1.5
+        assert redak["unit"] == "l"
+
+    def test_priblizna_mjera_se_prihvaca(self):
+        redak = redak_cjenika(poslovnica(), proizvod(quantity="1", unit="ca. 500g"))
+        assert redak["net_quantity"] == 500
+        assert redak["unit"] == "g"
+
+    def test_cista_jedinica_ima_prednost(self):
+        # Lanci koji `unit` ispunjavaju ispravno moraju ostati netaknuti:
+        # količina se i dalje uzima iz `quantity`, ne iz natpisa.
+        redak = redak_cjenika(poslovnica(), proizvod(quantity="250", unit="g"))
+        assert redak["net_quantity"] == 250
+        assert redak["unit"] == "g"
+
+    def test_slozen_natpis_ostaje_neprepoznat(self):
+        # Iz „2x250g" se ne vidi je li neto količina 250 ili 500. Kriva mjera
+        # tiho uđe u cijenu po kilogramu, pa je nikakva bolja od pogođene.
+        redak = redak_cjenika(poslovnica(), proizvod(quantity="", unit="2x250g"))
+        assert redak["unit"] is None
+
+    def test_nepoznata_jedinica_u_natpisu_ostaje_neprepoznata(self):
+        redak = redak_cjenika(poslovnica(), proizvod(quantity="", unit="500 vreca"))
+        assert redak["unit"] is None

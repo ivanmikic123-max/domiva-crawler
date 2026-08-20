@@ -137,16 +137,69 @@ def _neprazno(vrijednost: Any, najvise: int) -> str | None:
     return tekst[:najvise]
 
 
+# Natpis pakiranja umjesto čiste jedinice: „800g", „1,5l", „ca. 500g".
+#
+# Namjerno prima **samo** natpis koji je cijeli jedna mjera, uz dopušten „ca."
+# ispred. Oblici poput „2x250g" ostaju neprepoznati: iz njih se ne vidi je li
+# neto količina 250 ili 500, a pogrešna mjera je gora od nikakve — ona tiho
+# uđe u izračun cijene po kilogramu.
+_MJERA = re.compile(
+    r"^(?:ca\.?|cca\.?|~)?\s*(\d+(?:[.,]\d+)?)\s*([a-zA-Zžšćčđ.]+)$",
+    re.IGNORECASE,
+)
+
+
+def _mjera_iz_natpisa(vrijednost: Any) -> tuple[float, str] | None:
+    """
+    Broj i jedinica iz natpisa pakiranja.
+
+    Lidl u polje `JEDINICA_MJERE` upisuje cijelu mjeru („800g"), a ne jedinicu.
+    Uz to njegov `quantity` stoji u kilogramima i litrama, pa bi spajanje
+    `quantity=0.8` s izvučenim „g" dalo 0,8 grama — tisuću puta krivo. Zato se
+    uzimaju **oba** podatka iz natpisa ili nijedan.
+    """
+    if vrijednost is None:
+        return None
+
+    poklapanje = _MJERA.match(str(vrijednost).strip())
+    if poklapanje is None:
+        return None
+
+    jedinica = JEDINICE.get(poklapanje.group(2).strip().lower())
+    if jedinica is None:
+        return None
+
+    try:
+        broj = float(Decimal(poklapanje.group(1).replace(",", ".")))
+    except (InvalidOperation, ValueError):
+        return None
+
+    if broj <= 0:
+        return None
+
+    return broj, jedinica
+
+
 def redak_cjenika(store: Store, proizvod: Any) -> dict[str, Any]:
     """Jedan artikl u jednoj poslovnici."""
+    kolicina = _broj(proizvod.quantity)
+    jedinica = _jedinica(proizvod.unit)
+
+    # Natpis se čita samo kad čista jedinica nije prepoznata. Lanci koji
+    # `unit` ispunjavaju ispravno time ostaju netaknuti.
+    if jedinica is None:
+        iz_natpisa = _mjera_iz_natpisa(proizvod.unit)
+        if iz_natpisa is not None:
+            kolicina, jedinica = iz_natpisa
+
     return {
         "store_code": str(store.store_id).strip(),
         "external_code": str(proizvod.product_id).strip(),
         "ean": _ean(proizvod.barcode),
         "name": _neprazno(proizvod.product, 500) or "(bez naziva)",
         "brand": _neprazno(proizvod.brand, 200),
-        "net_quantity": _broj(proizvod.quantity),
-        "unit": _jedinica(proizvod.unit),
+        "net_quantity": kolicina,
+        "unit": jedinica,
         "category_raw": _neprazno(proizvod.category, 300),
         "price": _cijena(proizvod.price),
         "unit_price": _cijena(proizvod.unit_price),
