@@ -22,6 +22,18 @@ COPY crawler ./crawler
 COPY common ./common
 COPY domiva ./domiva
 
+# Koordinate poslovnica.
+#
+# `domiva/koordinate.py` ih traži u `enrichment/stores.csv`, relativno na sam
+# paket. Bez ove datoteke crawler radi, ali svaka poslovnica izlazi bez `lat` i
+# `lng` — uz upozorenje u dnevniku i bez ijedne greške. Domiva ih tada ne može
+# staviti u doseg, pa „poslovnice u krugu od 10 km" ostane prazno.
+#
+# Datoteka je pod AGPL-3, kao i ostatak ovog repozitorija. `products.csv` iz
+# istog izvora se **ne** kopira: on je CC BY-NC-SA i ne smije se koristiti.
+COPY enrichment/stores.csv ./enrichment/stores.csv
+COPY enrichment/cities.csv ./enrichment/cities.csv
+
 RUN pip install --no-cache-dir .
 
 # Ne radi kao root. Crawler obrađuje sadržaj s tuđih poslužitelja, pa je to

@@ -59,9 +59,14 @@ logs/
 .mypy_cache/
 .ruff_cache/
 
-# Documentation
-README.md
-LICENSE
+# Dokumentacija
+#
+# `README.md` i `LICENSE` **ostaju** u kontekstu, iako se čine suvišnima:
+# `pyproject.toml` ih navodi (`readme`, `license`), pa bez njih `pip install .`
+# padne na „/README.md: not found" — poruka koja izgleda kao problem s Dockerom,
+# a zapravo je nedostajuća datoteka koju traži pakiranje.
+#
+# Uz to, licenca u slici nije naodmet: crawler je pod AGPL-3.
 CLAUDE.md
 
 # Test files

@@ -17,13 +17,39 @@ Domiva je prikaže u katalogu, ali ne i u pretrazi po radijusu.
 from __future__ import annotations
 
 import csv
+import os
 from functools import lru_cache
 from logging import getLogger
 from pathlib import Path
 
 logger = getLogger(__name__)
 
-POPIS = Path(__file__).parents[1] / "enrichment" / "stores.csv"
+
+def _putanja_popisa() -> Path:
+    """
+    Gdje stoji `stores.csv`.
+
+    Iz repozitorija se pokreće pokraj paketa, pa je dovoljno gledati jedan
+    direktorij iznad. U spremniku to ne vrijedi: `pip install .` odnese paket u
+    `site-packages`, a `enrichment/` ostaje u `/app`. Ranije se tada gledalo
+    samo pokraj paketa, pa je crawler radio i **tiho** ispisivao poslovnice bez
+    koordinata — uz jedno upozorenje koje se izgubi među tisućama redaka.
+
+    Zato se traži na oba mjesta, a `DOMIVA_STORES_CSV` nadglasava oba kad
+    datoteka stoji negdje treće.
+    """
+    izvana = os.environ.get("DOMIVA_STORES_CSV", "").strip()
+    if izvana:
+        return Path(izvana)
+
+    pokraj_paketa = Path(__file__).parents[1] / "enrichment" / "stores.csv"
+    if pokraj_paketa.exists():
+        return pokraj_paketa
+
+    return Path("/app") / "enrichment" / "stores.csv"
+
+
+POPIS = _putanja_popisa()
 
 # Granice Hrvatske, grubo. Zadaća im je uhvatiti (0, 0) i zamijenjene stupce —
 # najčešće dvije greške u geokodiranim popisima. Poslovnica u Gvinejskom zaljevu
